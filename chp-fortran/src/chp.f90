@@ -314,21 +314,43 @@ contains
     end do 
   end subroutine 
 
-  subroutine plus(n) bind(c, name="plus_test")
+  subroutine bind_test(b, i, f) bind(c, name="bind_test")
     use iso_c_binding
     implicit none 
-    logical(c_bool), intent(in) :: n
-    write (*, *) "plus n", n
+    logical(c_bool), value, intent(in) :: b
+    integer(c_int), value, intent(in) :: i
+    real(c_float), value, intent(in) :: f
+    write (*, *) "bool", b
+    write (*, *) "integer", i
+    write (*, *) "float", f 
   end subroutine
 
-  subroutine prog(qubit_n, gate_n, prog_encoding, measure_array, pauli_res) bind(c, name="prog")
+  subroutine bind_test_vec(b, i, f, bs, is, n) bind(c, name="bind_test_vec")
     use iso_c_binding
     implicit none 
-    integer(c_int), intent(in) :: qubit_n, gate_n
+    logical(c_bool), value, intent(in) :: b
+    integer(c_int), value, intent(in) :: i
+    real(c_float), value, intent(in) :: f
+    integer(c_int), value, intent(in) :: n
+    logical(c_bool), intent(in) :: bs(n) 
+    integer(c_int), intent(in) :: is(n)
+    write (*, *) "bool", b
+    write (*, *) "integer", i
+    write (*, *) "float", f 
+    write (*, *) "[bool]", bs
+    write (*, *) "[int]", is
+  end subroutine
+
+  subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln) bind(c, name="prog")
+    use iso_c_binding
+    implicit none 
+    integer(c_int), value, intent(in) :: qubit_n, gate_n
     ! each gate occupy 3 int, the first int is the gate encoding, the second and third is the qubit encoding
-    integer(c_int), intent(in), dimension(:) :: prog_encoding
-    logical(c_bool), intent(inout), dimension(:) :: measure_array
-    logical(c_bool), intent(inout), dimension(:) :: pauli_res
+    integer(c_int), value, intent(in) :: prn, mn, pln
+    integer(c_int), intent(in) :: prog_encoding(prn)
+    logical(c_bool), intent(inout) :: measure_array(mn)
+    logical(c_bool), intent(inout) :: pauli_res(pln)
+
     type(generators) :: g 
     integer :: i, a, b, gate, measure_count
     type(measure_result) :: mr

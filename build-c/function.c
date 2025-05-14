@@ -9,11 +9,17 @@ int factorial( int n )
   return (n == 0) ? 1 : n * factorial(n - 1);
 }
 
-// void plus_test(bool n);
+void bind_test(bool b, int i, float f);
 
-void call_plus(bool n) {
+void main() {
+  bool b = false;
+  int i = 10;
+  float f = 3.14;
   printf("in c\n");
-  printf("%d\n", n);
+  printf("bool: %d\n", b);
+  printf("integer: %i\n", i);
+  printf("float: %f\n", f);
+
   printf("in fortran\n");
-  plus_test(n);
+  bind_test(b, i, f);
 }
