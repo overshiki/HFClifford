@@ -6,7 +6,7 @@ module chp
     ! (2n+1) * n matrix
     ! while the (2n + 1)st row for x_table and z_table serve as scratchpad
     logical, dimension(:, :), allocatable :: x_table, z_table
-    ! 2n vector
+    ! 2n+1 vector
     logical, dimension(:), allocatable :: r_table
   end type
 
@@ -21,9 +21,6 @@ module chp
   end type 
 
 contains
-  subroutine say_hello
-    print *, "Hello, chp!"
-  end subroutine say_hello
 
   subroutine hardmard(g, a)
     type(generators), intent(inout) :: g
@@ -165,6 +162,20 @@ contains
 
   end function
 
+  subroutine measure(g, a, mr)
+    type(generators), intent(inout) :: g
+    type(measure_result), intent(inout) :: mr
+    integer, intent(in) :: a
+    logical :: is_random 
+
+    is_random = is_random_measure(g, a)
+    if (is_random) then 
+      call random_measure(g, a, mr)
+    else 
+      call determinate_measure(g, a, mr)
+    end if 
+  end 
+
   pure function find_first_p(g, a) result(p)
     ! if the measurement yield random result, then find the first p \in {n+1, ..., 2n} such that x_pa == 1
     type(generators), intent(in) :: g
@@ -215,6 +226,18 @@ contains
     ! return rp as the measurement outcome
     mr%m = g%r_table(p)
 
+  end subroutine
+
+  subroutine init_empty(g)
+    type(generators), intent(inout) :: g
+    integer :: i 
+    g%x_table = .false.
+    g%z_table = .false.
+    g%r_table = .false.
+    do i=1, g%n 
+      g%x_table(i, i) = .true.
+      g%z_table(i + g%n, i) = .true.
+    end do 
   end subroutine
 
   subroutine determinate_measure(g, a, mr)
@@ -283,22 +306,75 @@ contains
     integer :: i 
     type(pauli_string) :: p
 
+    allocate(p%s(2 * g%n))
+
     do i=1, g%n 
       call readout_at(g, i, p)
       call pauli_string2pauli_binary(p, pbs(i, :))
     end do 
   end subroutine 
 
-  ! subroutine prog(qubit_n, measure_n, gate_n, prog_encoding, measure_array, pauli_string)
-  !   use iso_c_binding
-  !   implicit none 
-  !   integer(c_int), intent(in) :: qubit_n, measure_n, gate_n
-  !   ! each gate occupy 3 int, the first int is the gate encoding, the second and third is the qubit encoding
-  !   integer(c_int), intent(in), dimension(:) :: prog_encoding
-  !   logical(c_bool), intent(inout), dimension(:) :: measure_array
-  !   logical(c_bool), intent(inout), dimension(:) :: pauli_string
+  subroutine plus(n) bind(c, name="plus_test")
+    use iso_c_binding
+    implicit none 
+    logical(c_bool), intent(in) :: n
+    write (*, *) "plus n", n
+  end subroutine
 
+  subroutine prog(qubit_n, gate_n, prog_encoding, measure_array, pauli_res) bind(c, name="prog")
+    use iso_c_binding
+    implicit none 
+    integer(c_int), intent(in) :: qubit_n, gate_n
+    ! each gate occupy 3 int, the first int is the gate encoding, the second and third is the qubit encoding
+    integer(c_int), intent(in), dimension(:) :: prog_encoding
+    logical(c_bool), intent(inout), dimension(:) :: measure_array
+    logical(c_bool), intent(inout), dimension(:) :: pauli_res
+    type(generators) :: g 
+    integer :: i, a, b, gate, measure_count
+    type(measure_result) :: mr
+    logical(c_bool), dimension(:,:), allocatable :: pbs
+    integer :: start_slice, end_slice
 
-  ! end subroutine
+    g%n = qubit_n
+    allocate(g%x_table(2*qubit_n + 1, qubit_n))
+    allocate(g%z_table(2*qubit_n + 1, qubit_n))
+    allocate(g%r_table(2*qubit_n + 1))
+    call init_empty(g)
+
+    measure_count = 1
+    do i=1, gate_n
+      gate = prog_encoding(3 * (i - 1) + 1)
+      ! 1 for hardmard
+      if (gate .eq. 1) then 
+        a = prog_encoding(3 * (i - 1) + 2)
+        call hardmard(g, a)
+      ! 2 for phase
+      else if (gate .eq. 2) then 
+        a = prog_encoding(3 * (i - 1) + 2)
+        call phase(g, a)
+      ! 3 for cnot 
+      else if (gate .eq. 3) then 
+        a = prog_encoding(3 * (i - 1) + 2)
+        b = prog_encoding(3 * (i - 1) + 3)
+        call cnot(g, a, b)
+      ! 4 for measure 
+      else if (gate .eq. 4) then 
+        a = prog_encoding(3 * (i - 1) + 2)
+        call measure(g, a, mr)
+        measure_array(measure_count) = mr%m
+        measure_count = measure_count + 1
+      end if 
+    end do 
+
+    allocate(pbs(g%n, 2 * qubit_n + 1))
+    call readout(g, pbs)
+    ! squeeze pbs into pauli_res
+    do i=1, qubit_n
+      start_slice = (2 * qubit_n + 1) * (i - 1) + 1
+      end_slice = (2 * qubit_n + 1) * i
+      pauli_res(start_slice:end_slice) = pbs(i,:)
+    end do 
+
+  end subroutine
 
 end module chp
