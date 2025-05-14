@@ -1,5 +1,0 @@
-packages:
-  clifford-sim
-
-program-options
-  ghc-options: -L/home/le/lang/fortran/for-chp/clifford-sim/lib

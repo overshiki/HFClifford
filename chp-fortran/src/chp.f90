@@ -14,12 +14,6 @@ module chp
     logical :: m
   end type
 
-  type pauli_string
-    logical :: phase 
-    integer :: n 
-    logical, dimension(:), allocatable :: s
-  end type 
-
 contains
 
   subroutine hardmard(g, a)
@@ -32,9 +26,10 @@ contains
       xia = g%x_table(i, a)
       zia = g%z_table(i, a)
       ri = g%r_table(i)
-      res = ri .xor. (xia .and. zia)
 
+      res = ri .xor. (xia .and. zia)
       g%r_table(i) = res
+      ! swap xia with zia
       g%x_table(i, a) = zia 
       g%z_table(i, a) = xia
     end do
@@ -235,9 +230,15 @@ contains
     g%z_table = .false.
     g%r_table = .false.
     do i=1, g%n 
-      g%x_table(i, i) = .true.
-      g%z_table(i + g%n, i) = .true.
+      g%z_table(i, i) = .true.
+      g%x_table(i + g%n, i) = .true.
     end do 
+    ! write (*, *) "init"
+    ! write (*, *) "x table"
+    ! write (*, *) g%x_table
+    ! write (*, *) "z table"
+    ! write (*, *) g%z_table
+    ! write (*, *) "end"
   end subroutine
 
   subroutine determinate_measure(g, a, mr)
@@ -268,34 +269,25 @@ contains
 
   end subroutine
 
-  subroutine readout_at(g, i, p)
-    type(generators), intent(in) :: g
-    integer, intent(in) :: i 
-    type(pauli_string), intent(inout) :: p 
-    integer :: a 
-    logical :: xia, zia
-    p%n = g%n 
-
-    do a=1, g%n 
-      xia = g%x_table(i, a)
-      zia = g%x_table(i, a)
-      p%s(2 * (a - 1) + 1) = xia 
-      p%s(2 * (a - 1) + 2) = zia
-    end do 
-    p%phase = g%r_table(i)
-  end subroutine
-
-  subroutine pauli_string2pauli_binary(p, pb)
+  subroutine readout_at(g, i, s)
+    ! readout the ith row
     use iso_c_binding
     implicit none
-    type(pauli_string), intent(in) :: p
-    logical(c_bool), dimension(:) :: pb 
-    integer :: i
-    pb(1) = p%phase 
-    do i=1, p%n 
-      pb(2 * i) = p%s(2 * i - 1)
-      pb(2 * i + 1) = p%s(2 * i)
+    type(generators), intent(in) :: g
+    integer, intent(in) :: i 
+    logical(c_bool), dimension(:) :: s
+    integer :: a, pivot
+    logical :: xia, zia
+    s(1) = g%r_table(i)
+    do a=1, g%n 
+      xia = g%x_table(i, a)
+      zia = g%z_table(i, a)
+      pivot = 2 * (a - 1) + 2
+      s(pivot) = xia 
+      s(pivot + 1) = zia
     end do 
+    ! write (*, *) "readout_at"
+    ! write (*, *) s
   end subroutine
 
   subroutine readout(g, pbs)
@@ -304,42 +296,17 @@ contains
     type(generators), intent(in) :: g
     logical(c_bool), dimension(:,:) :: pbs 
     integer :: i 
-    type(pauli_string) :: p
-
-    allocate(p%s(2 * g%n))
 
     do i=1, g%n 
-      call readout_at(g, i, p)
-      call pauli_string2pauli_binary(p, pbs(i, :))
+      call readout_at(g, i, pbs(i, :))
     end do 
+    ! write (*, *) "readout"
+    ! write (*, *) "x table"
+    ! write (*, *) g%x_table
+    ! write (*, *) "z table"
+    ! write (*, *) g%z_table
+    ! write (*, *) "end"
   end subroutine 
-
-  subroutine bind_test(b, i, f) bind(c, name="bind_test")
-    use iso_c_binding
-    implicit none 
-    logical(c_bool), value, intent(in) :: b
-    integer(c_int), value, intent(in) :: i
-    real(c_float), value, intent(in) :: f
-    write (*, *) "bool", b
-    write (*, *) "integer", i
-    write (*, *) "float", f 
-  end subroutine
-
-  subroutine bind_test_vec(b, i, f, bs, is, n) bind(c, name="bind_test_vec")
-    use iso_c_binding
-    implicit none 
-    logical(c_bool), value, intent(in) :: b
-    integer(c_int), value, intent(in) :: i
-    real(c_float), value, intent(in) :: f
-    integer(c_int), value, intent(in) :: n
-    logical(c_bool), intent(in) :: bs(n) 
-    integer(c_int), intent(in) :: is(n)
-    write (*, *) "bool", b
-    write (*, *) "integer", i
-    write (*, *) "float", f 
-    write (*, *) "[bool]", bs
-    write (*, *) "[int]", is
-  end subroutine
 
   subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln) bind(c, name="prog")
     use iso_c_binding
@@ -396,7 +363,7 @@ contains
       end_slice = (2 * qubit_n + 1) * i
       pauli_res(start_slice:end_slice) = pbs(i,:)
     end do 
-
+    ! write (*, *) pauli_res
   end subroutine
 
 end module chp

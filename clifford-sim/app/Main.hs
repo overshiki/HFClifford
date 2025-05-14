@@ -3,67 +3,67 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where 
 import GHC.Generics (Generic(..))
--- import Foreign (Storable(..))
--- import Foreign.CStorable (CStorable(..))
 import Foreign.C.Types
 import Foreign.StablePtr
 import Foreign.Ptr
 import Foreign
 import System.IO.Unsafe
 import Foreign.Marshal.Array
+import Data.List
 
 import Ast
 import Parse
 
--- foreign import ccall "bind_func"
---     bind_func :: CBool -> CInt -> CFloat -> IO ()
-
-foreign import ccall "bind_test"
-    bind_test :: CBool -> CInt -> CFloat -> IO ()
-
-foreign import ccall "bind_test_vec"
-    bind_test_vec :: CBool -> CInt -> CFloat -> Ptr CBool -> Ptr CInt -> CInt -> IO ()
-
--- subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln)
 foreign import ccall "prog"
-    prog :: CInt -> CInt -> Ptr CInt -> CInt -> Ptr CBool -> CInt -> Ptr CBool -> CInt -> IO ()
+    prog :: CInt -> CInt           -- qubit_num -> gate_num 
+            -> Ptr CInt -> CInt    -- prog_encoding -> length
+            -> Ptr CBool -> CInt   -- measure_array -> length
+            -> Ptr CBool -> CInt   -- pauli_res -> length 
+            -> IO ()
+
+int2cint :: Int -> CInt
+int2cint = CInt . fromIntegral
+
+data VecPac a = VecPac
+  { d :: [a]
+  , dl :: CInt
+  }
+
+fromVec :: [a] -> VecPac a 
+fromVec xs = VecPac xs (int2cint $ length xs)
 
 data Prog = Prog 
   { nQubit :: CInt
   , nGate :: CInt
-  , circuitEncoding :: [CInt]
-  , encodingLength :: CInt
-  , nMeasure :: CInt
-  , measureResult :: [CBool]
-  , pauli :: [CBool]
-  , pauliLength :: CInt
+  , circEncode :: VecPac CInt
+  , measureRes :: VecPac CBool
+  , pauli :: VecPac CBool
   }
 
 runProg :: Prog -> IO (Ptr CBool, Ptr CBool)
 runProg (Prog { .. }) = do 
-  cePtr <- newArray circuitEncoding
-  mrPtr <- newArray measureResult
-  pauliPtr <- newArray pauli
-  prog nQubit nGate cePtr encodingLength mrPtr nMeasure pauliPtr pauliLength
+  cePtr <- newArray (d circEncode)
+  mrPtr <- newArray (d measureRes)
+  pauliPtr <- newArray (d pauli)
+  prog nQubit nGate cePtr (dl circEncode) mrPtr (dl measureRes) pauliPtr (dl pauli)
   return (pauliPtr, mrPtr)
 
 buildProg :: String -> IO Prog
 buildProg file = do 
-  s <- readFile "data/epr.chp"
+  s <- readFile file
   let 
     c@(Circuit gs) = runParser parseFile s 
-    cencoding = map (CInt . fromIntegral) (encoding c)
-    cenL = CInt $ fromIntegral $ length cencoding
-    ng = CInt $ fromIntegral $ length gs
-    nqubits = collectNumQubits c 
-    nq = CInt $ fromIntegral $ nqubits
-    nmeasure = collectMeasureNum c
-    nm = CInt $ fromIntegral nmeasure
-    measureResult = take nmeasure (repeat (CBool 0))
-    pauliL = (2 * nqubits + 1) * nqubits
-    pauliLength = CInt $ fromIntegral $ pauliL
-    pauli = take pauliL (repeat (CBool 0))
-  return $ Prog nq ng cencoding cenL nm measureResult pauli pauliLength
+    nq = collectNumQubits c 
+    ng = length gs
+    nm = collectMeasureNum c
+    pauliL = (2 * nq + 1) * nq
+  return $ Prog
+    { nQubit = int2cint nq
+    , nGate = int2cint ng
+    , circEncode = fromVec $ map int2cint (encoding c)
+    , measureRes = fromVec $ take nm (repeat (CBool 0))
+    , pauli = fromVec $ take pauliL (repeat (CBool 0))
+    }
 
 cbool2bool :: CBool -> Bool
 cbool2bool cb = case toInteger cb of 
@@ -76,30 +76,56 @@ readout i ptr = map cbool2bool <$> peekArray ii ptr
   where 
     ii = fromIntegral i 
 
+getPauliRepEach :: Int -> [Bool] -> String
+getPauliRepEach n (b:bs) = brep ++ bsrep 
+  where 
+    -- r is 1 if r has negative phase
+    -- r is 0 if r has postive phase
+    brep = if b then "-" else "+"
+    decodeFunc :: (Bool, Bool) -> String
+    decodeFunc (x, z) = case (x, z) of 
+      (True,  False) -> "X"
+      (False, True)  -> "Z"
+      (True,  True)  -> "Y"
+      (False, False) -> "I"
+    decodeSeq :: [Bool] -> String
+    decodeSeq (x:z:remains) = decodeFunc (x, z) ++ decodeSeq remains
+    decodeSeq [] = ""
+
+    bsrep = decodeSeq bs
+
+getPauliRep :: Int -> [Bool] -> String 
+getPauliRep n bs@(b:_) = (getPauliRepEach n cs) ++ "\n" ++ (getPauliRep n remains)
+  where 
+    eachLength = 2 * n + 1
+    (cs, remains) = if (length bs) >= eachLength 
+      then splitAt eachLength bs 
+      else error "value error"
+getPauliRep n [] = ""
+
+run :: String -> IO ()
+run file = do 
+  prog@(Prog {..}) <- buildProg file
+  (pauliPtr, mrPtr) <- runProg prog
+  pauliRep <- readout (dl pauli) pauliPtr
+  measures <- readout (dl measureRes) mrPtr
+  putStrLn $ "program to run: " ++ file
+  putStrLn $ "nQubit: " ++ show nQubit
+  -- putStrLn $ "pauli Length: " ++ show (dl pauli)
+  putStrLn $ "pauliRep:"
+  putStr $ getPauliRep (fromIntegral nQubit) pauliRep
+  -- print pauliRep
+  putStrLn $ "measureRes:"
+  print measures
+  putStrLn ""
+  return ()
+
 main :: IO ()
 main = do
-  let 
-    b = CBool 0
-    f = CFloat 3.14 
-    i = CInt 10
-    n = CInt 3
-  -- print "in c and then fortran"
-  -- bind_func b i f 
-  print "in direct fortran"
-  bind_test b i f
-
-  p <- newArray [CBool 1, CBool 0, CBool 1]
-  pi <- newArray [CInt 1, CInt 2, CInt 10]
-  bind_test_vec b i f p pi n
-
-  s <- readFile "data/epr.chp"
-  let c = runParser parseFile s 
-  print c
-
-  prog@(Prog {..}) <- buildProg "data/epr.chp"
-  (pauliPtr, mrPtr) <- runProg prog
-  pauliRep <- readout pauliLength pauliPtr
-  measures <- readout nMeasure mrPtr
-  print pauliRep
-  print measures
-  return ()
+  putStrLn "welcome to HFClifford!"
+  run "data/epr.chp"
+  run "data/ghz.chp"
+  run "data/teleport.chp"
+  run "data/simon.chp"
+  run "data/densecoding.chp"
+  run "data/qecc9.chp"
