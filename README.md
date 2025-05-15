@@ -1,7 +1,7 @@
 # HFClifford
 Clifford simulator written in `Haskell` and `Fortran`
 
-let `fortran` handles the core numerical part, and let `haskell` handles all others
+let `Fortran` handles the core numerical part, and let `Haskell` handles all others
 
 ### preperation
 in current dir
