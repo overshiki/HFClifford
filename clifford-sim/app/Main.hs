@@ -10,6 +10,7 @@ import Foreign
 import System.IO.Unsafe
 import Foreign.Marshal.Array
 import Data.List
+import System.Environment (getArgs)
 
 import Ast
 import Parse
@@ -120,8 +121,8 @@ run file = do
   putStrLn ""
   return ()
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
   putStrLn "welcome to HFClifford!"
   run "data/epr.chp"
   run "data/ghz.chp"
@@ -129,3 +130,9 @@ main = do
   run "data/simon.chp"
   run "data/densecoding.chp"
   run "data/qecc9.chp"
+
+main :: IO ()
+main = do
+  [file] <- getArgs
+  putStrLn "welcome to HFClifford!"
+  run file

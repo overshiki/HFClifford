@@ -61,6 +61,7 @@ executable clifford-sim
     other-modules:
         Ast
         , Parse
+        , Paths_clifford_sim
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -86,9 +87,3 @@ executable clifford-sim
 
     extra-lib-dirs:
         lib
-
-    -- other-modules:
-        -- Paths_clifford_sim
-
-    -- c-sources:        
-    --     csrc/function.c
