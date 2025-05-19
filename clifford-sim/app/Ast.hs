@@ -66,4 +66,56 @@ instance Encoding [Gate] where
 instance Encoding Circuit where 
   encoding (Circuit gs) = encoding gs
 
+class BEncoding a where 
+  bencoding :: a -> [Bool]
 
+xor :: Bool -> Bool -> Bool
+xor True True = False 
+xor True False = True 
+xor False True = True 
+xor False False = False
+
+newtype SingleGLookUp = SingleGLookUp [(Bool, Bool)]
+
+instance BEncoding SingleGLookUp where 
+  bencoding (SingleGLookUp bs) = bpack bs
+    where 
+      bpack :: [(Bool, Bool)] -> [Bool]
+      bpack ((b1, b2):rbs) = b1:b2:(bpack rbs)
+      bpack [] = []
+
+newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> (Bool, Bool))
+
+hFlow :: SingleStabFlow
+hFlow = SingleStabFlow func 
+  where 
+    func xia zia = (zia, xia)
+
+singleFlow2lookup :: SingleStabFlow -> SingleGLookUp
+singleFlow2lookup (SingleStabFlow func) = SingleGLookUp
+  [ 
+  -- 00
+    func False False
+  -- 01
+  , func False True
+  -- 10 
+  , func True False 
+  -- 11 
+  , func True True
+  ]
+
+hLookUp :: SingleGLookUp
+hLookUp = singleFlow2lookup hFlow
+
+pFlow :: SingleStabFlow
+pFlow = SingleStabFlow func 
+  where 
+    func xia zia = (xia, xia `xor` zia)
+
+pLookUp :: SingleGLookUp
+pLookUp = singleFlow2lookup pFlow
+
+-- 1 for hardmard 
+-- 2 for phase
+gateRepresentation :: [Bool]
+gateRepresentation = (bencoding hLookUp) ++ (bencoding pLookUp)

@@ -16,9 +16,67 @@ module chp
 
 contains
 
-  subroutine hardmard(g, a)
+  pure function unpack_gate_rep(gate_rep) result(res)
+    logical, intent(in) :: gate_rep(8)
+    logical :: res(4, 2)
+    integer :: i 
+    do i=1, 4 
+      res(i, :) = gate_rep(((i-1)*2 + 1):i*2)
+    end do 
+  end function
+
+  pure function logical2number(xia, zia) result(n)
+    logical, intent(in) :: xia, zia 
+    integer :: n 
+    ! 00
+    if ((.not. xia) .and. (.not. zia)) then 
+      n = 1
+    ! 01
+    else if ((.not. xia) .and. zia) then 
+      n = 2
+    ! 10
+    else if (xia .and. (.not. zia)) then 
+      n = 3
+    ! 11
+    else 
+      n = 4 
+    end if 
+  end function 
+
+  pure function get_hardmard_rep(gate_rep_pack) result(res)
+    ! 1 for hardmard
+    logical, intent(in) :: gate_rep_pack(:)
+    logical :: res(4, 2)
+    res = unpack_gate_rep(gate_rep_pack(1:8))
+  end function
+
+  pure function get_phase_rep(gate_rep_pack) result(res)
+    ! 2 for hardmard
+    logical, intent(in) :: gate_rep_pack(:)
+    logical :: res(4, 2)
+    res = unpack_gate_rep(gate_rep_pack(9:16))
+  end function
+
+  pure function single_lookup_x(xia, zia, gate_rep) result(res)
+    ! single qubit gate lookup
+    logical, intent(in) :: xia, zia 
+    logical, intent(in) :: gate_rep(4, 2)
+    logical :: res
+    res = gate_rep(logical2number(xia, zia), 1)
+  end function
+
+  pure function single_lookup_z(xia, zia, gate_rep) result(res)
+    ! single qubit gate lookup
+    logical, intent(in) :: xia, zia 
+    logical, intent(in) :: gate_rep(4, 2)
+    logical :: res
+    res = gate_rep(logical2number(xia, zia), 2)
+  end function
+
+  subroutine hardmard(g, a, gate_rep)
     type(generators), intent(inout) :: g
     integer, intent(in) :: a
+    logical, intent(in) :: gate_rep(4, 2)
     integer :: i
     logical :: xia, zia, ri, res
 
@@ -30,15 +88,18 @@ contains
       res = ri .xor. (xia .and. zia)
       g%r_table(i) = res
       ! swap xia with zia
-      g%x_table(i, a) = zia 
-      g%z_table(i, a) = xia
+      g%x_table(i, a) = single_lookup_x(xia, zia, gate_rep)
+        ! zia 
+      g%z_table(i, a) = single_lookup_z(xia, zia, gate_rep)
+        ! xia
     end do
 
   end subroutine
 
-  subroutine phase(g, a)
+  subroutine phase(g, a, gate_rep)
     type(generators), intent(inout) :: g
     integer, intent(in) :: a
+    logical, intent(in) :: gate_rep(4, 2)
     integer :: i
     logical :: xia, zia, ri, res
 
@@ -49,8 +110,10 @@ contains
       res = ri .xor. (xia .and. zia)
       g%r_table(i) = res
 
-      res = zia .xor. xia
-      g%z_table(i, a) = res
+      ! res = zia .xor. xia
+      ! g%z_table(i, a) = res
+      g%x_table(i, a) = single_lookup_x(xia, zia, gate_rep)
+      g%z_table(i, a) = single_lookup_z(xia, zia, gate_rep)
     end do
 
   end subroutine
@@ -233,12 +296,6 @@ contains
       g%z_table(i, i) = .true.
       g%x_table(i + g%n, i) = .true.
     end do 
-    ! write (*, *) "init"
-    ! write (*, *) "x table"
-    ! write (*, *) g%x_table
-    ! write (*, *) "z table"
-    ! write (*, *) g%z_table
-    ! write (*, *) "end"
   end subroutine
 
   subroutine determinate_measure(g, a, mr)
@@ -286,8 +343,6 @@ contains
       s(pivot) = xia 
       s(pivot + 1) = zia
     end do 
-    ! write (*, *) "readout_at"
-    ! write (*, *) s
   end subroutine
 
   subroutine readout(g, pbs)
@@ -300,29 +355,33 @@ contains
     do i=1, g%n 
       call readout_at(g, i, pbs(i, :))
     end do 
-    ! write (*, *) "readout"
-    ! write (*, *) "x table"
-    ! write (*, *) g%x_table
-    ! write (*, *) "z table"
-    ! write (*, *) g%z_table
-    ! write (*, *) "end"
   end subroutine 
 
-  subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln) bind(c, name="prog")
+  subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln, gate_rep, repln) bind(c, name="prog")
     use iso_c_binding
     implicit none 
     integer(c_int), value, intent(in) :: qubit_n, gate_n
     ! each gate occupy 3 int, the first int is the gate encoding, the second and third is the qubit encoding
-    integer(c_int), value, intent(in) :: prn, mn, pln
+    integer(c_int), value, intent(in) :: prn, mn, pln, repln
     integer(c_int), intent(in) :: prog_encoding(prn)
     logical(c_bool), intent(inout) :: measure_array(mn)
     logical(c_bool), intent(inout) :: pauli_res(pln)
+    logical(c_bool), intent(in) :: gate_rep(repln)
+    logical :: grep(repln)
 
     type(generators) :: g 
     integer :: i, a, b, gate, measure_count
     type(measure_result) :: mr
     logical(c_bool), dimension(:,:), allocatable :: pbs
     integer :: start_slice, end_slice
+    logical :: hardmard_rep(4, 2), phase_rep(4, 2)
+
+    do i=1, repln
+      grep(i) = logical(gate_rep(i))
+    end do 
+
+    hardmard_rep = get_hardmard_rep(grep)
+    phase_rep = get_phase_rep(grep)
 
     g%n = qubit_n
     allocate(g%x_table(2*qubit_n + 1, qubit_n))
@@ -336,11 +395,11 @@ contains
       ! 1 for hardmard
       if (gate .eq. 1) then 
         a = prog_encoding(3 * (i - 1) + 2)
-        call hardmard(g, a)
+        call hardmard(g, a, hardmard_rep)
       ! 2 for phase
       else if (gate .eq. 2) then 
         a = prog_encoding(3 * (i - 1) + 2)
-        call phase(g, a)
+        call phase(g, a, phase_rep)
       ! 3 for cnot 
       else if (gate .eq. 3) then 
         a = prog_encoding(3 * (i - 1) + 2)

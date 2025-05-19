@@ -20,6 +20,7 @@ foreign import ccall "prog"
             -> Ptr CInt -> CInt    -- prog_encoding -> length
             -> Ptr CBool -> CInt   -- measure_array -> length
             -> Ptr CBool -> CInt   -- pauli_res -> length 
+            -> Ptr CBool -> CInt   -- gate_rep
             -> IO ()
 
 int2cint :: Int -> CInt
@@ -39,6 +40,7 @@ data Prog = Prog
   , circEncode :: VecPac CInt
   , measureRes :: VecPac CBool
   , pauli :: VecPac CBool
+  , gateRep :: VecPac CBool
   }
 
 runProg :: Prog -> IO (Ptr CBool, Ptr CBool)
@@ -46,7 +48,12 @@ runProg (Prog { .. }) = do
   cePtr <- newArray (d circEncode)
   mrPtr <- newArray (d measureRes)
   pauliPtr <- newArray (d pauli)
-  prog nQubit nGate cePtr (dl circEncode) mrPtr (dl measureRes) pauliPtr (dl pauli)
+  gateRepPtr <- newArray (d gateRep)
+  prog nQubit nGate 
+    cePtr (dl circEncode) 
+    mrPtr (dl measureRes) 
+    pauliPtr (dl pauli)
+    gateRepPtr (dl gateRep)
   return (pauliPtr, mrPtr)
 
 buildProg :: String -> IO Prog
@@ -64,6 +71,7 @@ buildProg file = do
     , circEncode = fromVec $ map int2cint (encoding c)
     , measureRes = fromVec $ take nm (repeat (CBool 0))
     , pauli = fromVec $ take pauliL (repeat (CBool 0))
+    , gateRep = fromVec (map bool2cbool gateRepresentation)
     }
 
 cbool2bool :: CBool -> Bool
@@ -71,6 +79,10 @@ cbool2bool cb = case toInteger cb of
   0 -> False 
   1 -> True
   _ -> error "value error"
+
+bool2cbool :: Bool -> CBool
+bool2cbool False = CBool 0 
+bool2cbool True = CBool 1
 
 readout :: CInt -> Ptr CBool -> IO [Bool]
 readout i ptr = map cbool2bool <$> peekArray ii ptr
