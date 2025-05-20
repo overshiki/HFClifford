@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Ast where 
+module Ast where
 import Data.Hashable
 import GHC.Generics
 
@@ -13,11 +13,11 @@ newtype QIndex = QIndex Int
 newtype SIndex = SIndex Int
   deriving (Show, Eq, Generic, Hashable)
 
-data Gate 
+data Gate
   = H QIndex
   | CNOT QIndex QIndex
   | M QIndex
-  | P QIndex 
+  | P QIndex
   deriving (Show)
 
 newtype Circuit = Circuit [Gate]
@@ -25,32 +25,32 @@ newtype Circuit = Circuit [Gate]
 
 collectNumQubits_ :: Int -> Circuit -> Int
 collectNumQubits_ n (Circuit (g:gs)) = collectNumQubits_ (max mindex n) (Circuit gs)
-  where 
-    mindex = case g of 
-      (H (QIndex i)) -> i 
-      (CNOT (QIndex i) (QIndex j)) -> max i j 
-      (M (QIndex i)) -> i 
+  where
+    mindex = case g of
+      (H (QIndex i)) -> i
+      (CNOT (QIndex i) (QIndex j)) -> max i j
+      (M (QIndex i)) -> i
       (P (QIndex i)) -> i
-collectNumQubits_ n (Circuit []) = n 
+collectNumQubits_ n (Circuit []) = n
 
-collectNumQubits :: Circuit -> Int 
+collectNumQubits :: Circuit -> Int
 collectNumQubits c = collectNumQubits_ 0 c + 1 -- it starts from 0, in future, use more robust range treatment
 
 collectMeasureNum_ :: Int -> Circuit -> Int
 collectMeasureNum_ n (Circuit (g:gs)) = collectMeasureNum_ nn (Circuit gs)
-  where 
-    nn = case g of 
+  where
+    nn = case g of
       (M _) -> n + 1
-      _ -> n 
-collectMeasureNum_ n (Circuit []) = n 
+      _ -> n
+collectMeasureNum_ n (Circuit []) = n
 
-collectMeasureNum :: Circuit -> Int 
+collectMeasureNum :: Circuit -> Int
 collectMeasureNum c = collectMeasureNum_ 0 c
 
-class Encoding a where 
+class Encoding a where
   encoding :: a -> [Int]
 
-instance Encoding Gate where 
+instance Encoding Gate where
   -- 1 for hardmard
   encoding (H (QIndex i)) = [1, i + 1, 0]
   -- 2 for phase
@@ -60,56 +60,71 @@ instance Encoding Gate where
   -- 4 for measure 
   encoding (M (QIndex i)) = [4, i + 1, 0]
 
-instance Encoding [Gate] where 
+instance Encoding [Gate] where
   encoding gs = concatMap encoding gs
 
-instance Encoding Circuit where 
+instance Encoding Circuit where
   encoding (Circuit gs) = encoding gs
 
-class BEncoding a where 
+class BEncoding a where
   bencoding :: a -> [Bool]
 
 xor :: Bool -> Bool -> Bool
-xor True True = False 
-xor True False = True 
-xor False True = True 
+xor True True = False
+xor True False = True
+xor False True = True
 xor False False = False
 
 newtype SingleGLookUp = SingleGLookUp [(Bool, Bool)]
 
-instance BEncoding SingleGLookUp where 
+instance BEncoding SingleGLookUp where
   bencoding (SingleGLookUp bs) = bpack bs
-    where 
+    where
       bpack :: [(Bool, Bool)] -> [Bool]
       bpack ((b1, b2):rbs) = b1:b2:(bpack rbs)
       bpack [] = []
 
+-- newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> Bool -> (Bool, Bool, Bool))
+
+-- hFlow :: SingleStabFlow
+-- hFlow = SingleStabFlow func
+--   where
+--     func xia zia ri = (zia, xia, ri)
+
 newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> (Bool, Bool))
 
 hFlow :: SingleStabFlow
-hFlow = SingleStabFlow func 
-  where 
+hFlow = SingleStabFlow func
+  where
     func xia zia = (zia, xia)
+
+type BitWidth = Int
+int2boolL_ :: [Bool] -> BitWidth -> Int -> [Bool]
+int2boolL_ blist 0 0 = blist
+int2boolL_ _ 0 _ = error "value error: input integer is larger than 2^bitwidth"
+int2boolL_ blist bw b = int2boolL_ (bt:blist) (bw - 1) nb
+  where
+    bt = odd b
+    nb = b `div` 2
+
+int2boolL :: BitWidth -> Int -> [Bool]
+int2boolL = int2boolL_ []
+ 
 
 singleFlow2lookup :: SingleStabFlow -> SingleGLookUp
 singleFlow2lookup (SingleStabFlow func) = SingleGLookUp
-  [ 
-  -- 00
-    func False False
-  -- 01
-  , func False True
-  -- 10 
-  , func True False 
-  -- 11 
-  , func True True
-  ]
+  $ take 4 $ map (nfunc . int2boolL 2) [0 .. ]
+  where 
+    nfunc [x, y] = func x y
+    nfunc _ = error "value error"
+
 
 hLookUp :: SingleGLookUp
 hLookUp = singleFlow2lookup hFlow
 
 pFlow :: SingleStabFlow
-pFlow = SingleStabFlow func 
-  where 
+pFlow = SingleStabFlow func
+  where
     func xia zia = (xia, xia `xor` zia)
 
 pLookUp :: SingleGLookUp
