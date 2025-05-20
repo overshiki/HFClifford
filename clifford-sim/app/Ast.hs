@@ -75,28 +75,21 @@ xor True False = True
 xor False True = True
 xor False False = False
 
-newtype SingleGLookUp = SingleGLookUp [(Bool, Bool)]
+newtype SingleGLookUp = SingleGLookUp [(Bool, Bool, Bool)]
 
 instance BEncoding SingleGLookUp where
   bencoding (SingleGLookUp bs) = bpack bs
     where
-      bpack :: [(Bool, Bool)] -> [Bool]
-      bpack ((b1, b2):rbs) = b1:b2:(bpack rbs)
+      bpack :: [(Bool, Bool, Bool)] -> [Bool]
+      bpack ((b1, b2, b3):rbs) = b1:b2:b3:(bpack rbs)
       bpack [] = []
 
--- newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> Bool -> (Bool, Bool, Bool))
-
--- hFlow :: SingleStabFlow
--- hFlow = SingleStabFlow func
---   where
---     func xia zia ri = (zia, xia, ri)
-
-newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> (Bool, Bool))
+newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> Bool -> (Bool, Bool, Bool))
 
 hFlow :: SingleStabFlow
 hFlow = SingleStabFlow func
   where
-    func xia zia = (zia, xia)
+    func xia zia ri = (zia, xia, ri `xor` (xia && zia))
 
 type BitWidth = Int
 int2boolL_ :: [Bool] -> BitWidth -> Int -> [Bool]
@@ -113,9 +106,9 @@ int2boolL = int2boolL_ []
 
 singleFlow2lookup :: SingleStabFlow -> SingleGLookUp
 singleFlow2lookup (SingleStabFlow func) = SingleGLookUp
-  $ take 4 $ map (nfunc . int2boolL 2) [0 .. ]
+  $ take 8 $ map (nfunc . int2boolL 3) [0 .. ]
   where 
-    nfunc [x, y] = func x y
+    nfunc [x, y, z] = func x y z
     nfunc _ = error "value error"
 
 
@@ -125,7 +118,7 @@ hLookUp = singleFlow2lookup hFlow
 pFlow :: SingleStabFlow
 pFlow = SingleStabFlow func
   where
-    func xia zia = (xia, xia `xor` zia)
+    func xia zia ri = (xia, xia `xor` zia, ri `xor` (xia && zia))
 
 pLookUp :: SingleGLookUp
 pLookUp = singleFlow2lookup pFlow

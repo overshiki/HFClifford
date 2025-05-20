@@ -17,66 +17,81 @@ module chp
 contains
 
   pure function unpack_gate_rep(gate_rep) result(res)
-    logical, intent(in) :: gate_rep(8)
-    logical :: res(4, 2)
+    logical, intent(in) :: gate_rep(24)
+    logical :: res(8, 3)
     integer :: i 
-    do i=1, 4 
-      res(i, :) = gate_rep(((i-1)*2 + 1):i*2)
+    do i=1, 8 
+      res(i, :) = gate_rep(((i-1)*3 + 1):i*3)
     end do 
   end function
 
-  pure function logical2number(xia, zia) result(n)
-    logical, intent(in) :: xia, zia 
-    integer :: n 
-    ! 00
-    if ((.not. xia) .and. (.not. zia)) then 
-      n = 1
-    ! 01
-    else if ((.not. xia) .and. zia) then 
-      n = 2
-    ! 10
-    else if (xia .and. (.not. zia)) then 
-      n = 3
-    ! 11
+  pure function logical2int(l) result(res)
+    logical, intent(in) :: l 
+    integer :: res 
+    if (l) then 
+      res = 1 
     else 
-      n = 4 
-    end if 
+      res = 0
+    end if
+  end function
+
+  pure function logical2number(ps, n) result(res)
+    integer, intent(in) :: n
+    logical, intent(in) :: ps(n) 
+    integer :: res
+    integer :: i 
+
+    res = 0
+    do i=1, n
+      res = res + logical2int(ps(i)) * (2 ** (n - i))
+    end do 
+
+    ! in fortran, we start from 1
+    res = res + 1
   end function 
 
   pure function get_hardmard_rep(gate_rep_pack) result(res)
     ! 1 for hardmard
     logical, intent(in) :: gate_rep_pack(:)
-    logical :: res(4, 2)
-    res = unpack_gate_rep(gate_rep_pack(1:8))
+    logical :: res(8, 3)
+    res = unpack_gate_rep(gate_rep_pack(1:24))
   end function
 
   pure function get_phase_rep(gate_rep_pack) result(res)
     ! 2 for hardmard
     logical, intent(in) :: gate_rep_pack(:)
-    logical :: res(4, 2)
-    res = unpack_gate_rep(gate_rep_pack(9:16))
+    logical :: res(8, 3)
+    res = unpack_gate_rep(gate_rep_pack(25:48))
   end function
 
-  pure function single_lookup_x(xia, zia, gate_rep) result(res)
+  pure function single_lookup_x(xia, zia, ri, gate_rep) result(res)
     ! single qubit gate lookup
-    logical, intent(in) :: xia, zia 
-    logical, intent(in) :: gate_rep(4, 2)
+    logical, intent(in) :: xia, zia, ri
+    logical, intent(in) :: gate_rep(8, 3)
     logical :: res
-    res = gate_rep(logical2number(xia, zia), 1)
+    res = gate_rep(logical2number([xia, zia, ri], 3), 1)
   end function
 
-  pure function single_lookup_z(xia, zia, gate_rep) result(res)
+  pure function single_lookup_z(xia, zia, ri, gate_rep) result(res)
     ! single qubit gate lookup
-    logical, intent(in) :: xia, zia 
-    logical, intent(in) :: gate_rep(4, 2)
+    logical, intent(in) :: xia, zia, ri 
+    logical, intent(in) :: gate_rep(8, 3)
     logical :: res
-    res = gate_rep(logical2number(xia, zia), 2)
+    res = gate_rep(logical2number([xia, zia, ri], 3), 2)
+  end function
+
+  pure function single_lookup_r(xia, zia, ri, gate_rep) result(res)
+    ! single qubit gate lookup
+    logical, intent(in) :: xia, zia, ri 
+    logical, intent(in) :: gate_rep(8, 3)
+    logical :: res
+    res = gate_rep(logical2number([xia, zia, ri], 3), 3)
   end function
 
   subroutine hardmard(g, a, gate_rep)
     type(generators), intent(inout) :: g
     integer, intent(in) :: a
-    logical, intent(in) :: gate_rep(4, 2)
+    logical, intent(in) :: gate_rep(8, 3)
     integer :: i
     logical :: xia, zia, ri, res
 
@@ -86,11 +101,12 @@ contains
       ri = g%r_table(i)
 
       res = ri .xor. (xia .and. zia)
-      g%r_table(i) = res
+      g%r_table(i) = single_lookup_r(xia, zia, ri, gate_rep)
+      ! res
       ! swap xia with zia
-      g%x_table(i, a) = single_lookup_x(xia, zia, gate_rep)
+      g%x_table(i, a) = single_lookup_x(xia, zia, ri, gate_rep)
         ! zia 
-      g%z_table(i, a) = single_lookup_z(xia, zia, gate_rep)
+      g%z_table(i, a) = single_lookup_z(xia, zia, ri, gate_rep)
         ! xia
     end do
 
@@ -99,7 +115,7 @@ contains
   subroutine phase(g, a, gate_rep)
     type(generators), intent(inout) :: g
     integer, intent(in) :: a
-    logical, intent(in) :: gate_rep(4, 2)
+    logical, intent(in) :: gate_rep(8, 3)
     integer :: i
     logical :: xia, zia, ri, res
 
@@ -108,12 +124,13 @@ contains
       zia = g%z_table(i, a)
       ri = g%r_table(i)
       res = ri .xor. (xia .and. zia)
-      g%r_table(i) = res
+      g%r_table(i) = single_lookup_r(xia, zia, ri, gate_rep) 
+      ! res
 
       ! res = zia .xor. xia
       ! g%z_table(i, a) = res
-      g%x_table(i, a) = single_lookup_x(xia, zia, gate_rep)
-      g%z_table(i, a) = single_lookup_z(xia, zia, gate_rep)
+      g%x_table(i, a) = single_lookup_x(xia, zia, ri, gate_rep)
+      g%z_table(i, a) = single_lookup_z(xia, zia, ri, gate_rep)
     end do
 
   end subroutine
@@ -374,7 +391,7 @@ contains
     type(measure_result) :: mr
     logical(c_bool), dimension(:,:), allocatable :: pbs
     integer :: start_slice, end_slice
-    logical :: hardmard_rep(4, 2), phase_rep(4, 2)
+    logical :: hardmard_rep(8, 3), phase_rep(8, 3)
 
     do i=1, repln
       grep(i) = logical(gate_rep(i))
