@@ -14,7 +14,11 @@ import Data.Equality.Analysis
 import Data.Equality.Graph
 import Data.Equality.Graph.Lens
 
-data Sign = Pos | Neg
+data IdNum = One | Img
+  deriving (Eq, Ord, Show)
+
+data PivotNum = Pos IdNum 
+  | Neg IdNum
   deriving (Eq, Ord, Show)
 
 data Pauli = X | Z | Y | I
@@ -22,9 +26,9 @@ data Pauli = X | Z | Y | I
 
 data SymExpr a = 
   a :*: a
-  | Pauli :&: a
-  | One Sign 
-  | Img Sign
+  | a :&: a
+  | P Pauli
+  | N PivotNum
   | E
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
@@ -34,19 +38,10 @@ infix 7 :*:
 cost :: CostFunction SymExpr Int
 cost = \case
   (a :*: b) -> a + b
-  (One _) -> 1
-  (Img _) -> 1
+  (a :&: b) -> a + b + 2
+  (P _) -> 1
+  (N _) -> 1
   E -> 0
-  -- (_ :&: c) -> 1 + c
-  -- c1 :&: c2 -> c1 + c2 + 5
-
--- -- XY = iZ 
--- -- YZ = iX 
--- -- ZX = iY
--- -- YX = -iZ 
--- -- ZY = -iX
--- -- XZ = -iY 
--- -- X^2 = Y^2 = Z^2 = I
 
 rewrites :: [Rewrite () SymExpr]
 rewrites =
@@ -56,15 +51,40 @@ rewrites =
     -- for PivotNum: (a * b) * c = a * (b * c)
     , pat (pat ("a" :*: "b") :*: "c") := pat ("a" :*: pat ("b" :*: "c"))
     -- for PivotNum: 1 * a = a
-    , pat ((pat (One Pos)) :*: "a") := "a"
-    -- for PivotNum: i * i = -1
-    , pat (pat ((pat (Img Pos)) :*: (pat (Img Pos))) :*: "c") := pat ((pat (One Neg)) :*: "c")
-    -- for PivotNum: (-1) * i = -i 
-    , pat (pat ((pat (One Neg)) :*: (pat (Img Pos))) :*: "c") := pat ((pat (Img Neg)) :*: "c")
-    -- for PivotNum: (-1) * (-1) = 1
-    , pat (pat ((pat (One Neg)) :*: (pat (One Neg))) :*: "c") := pat ((pat (One Pos)) :*: "c")
+    , pat ((pat (N (Pos One))) :*: "a") := "a"
+    -- -- for PivotNum: i * i = -1
+    , pivotFunc (Pos Img) (Pos Img) (Neg One)
+    -- -- for PivotNum: (-1) * i = -i 
+    , pivotFunc (Neg One) (Pos Img) (Neg Img)
+    -- -- for PivotNum: (-1) * (-1) = 1
+    , pivotFunc (Neg One) (Neg One) (Pos One)
 
+    -- for pauli: (a & b) & c = a & (b & c)
+    , pat (pat ("a" :&: "b") :&: "c") := pat ("a" :&: pat ("b" :&: "c"))
+    -- XY = iZ 
+    , pauliFunc X Y (Pos Img) Z
+    -- YZ = iX 
+    , pauliFunc Y Z (Pos Img) X 
+    -- ZX = iY
+    , pauliFunc Z X (Pos Img) Y 
+    -- YX = -iZ 
+    , pauliFunc Y X (Neg Img) Z 
+    -- ZY = -iX
+    , pauliFunc Z Y (Neg Img) X 
+    -- XZ = -iY 
+    , pauliFunc X Z (Neg Img) Y 
+    -- -- X^2 = Y^2 = Z^2 = I
+    , pauliFunc X X (Pos One) I
+    , pauliFunc Y Y (Pos One) I
+    , pauliFunc Z Z (Pos One) I
   ]
+  where 
+    pivotFunc :: PivotNum -> PivotNum -> PivotNum -> Rewrite () SymExpr
+    pivotFunc n1 n2 n3 = pat (pat ((pat (N n1)) :*: (pat (N n2))) :*: "c") := pat ((pat (N n3)) :*: "c")
+
+    pauliFunc :: Pauli -> Pauli -> PivotNum -> Pauli -> Rewrite () SymExpr
+    pauliFunc p1 p2 piv p3 = pat ((pat (P p1)) :&: (pat (P p2))) := pat (pat (N piv) :*: (pat (P p3)))
+
 
 rewrite :: Fix SymExpr -> Fix SymExpr
 rewrite e = fst (equalitySaturation e rewrites cost)
@@ -72,12 +92,15 @@ rewrite e = fst (equalitySaturation e rewrites cost)
 (.*.) :: Fix SymExpr -> Fix SymExpr -> Fix SymExpr
 a .*. b = Fix (a :*: b)
 
-oneSign :: Sign -> Fix SymExpr
-oneSign s = Fix (One s)
+(.&.) :: Fix SymExpr -> Fix SymExpr -> Fix SymExpr
+a .&. b = Fix (a :&: b)
 
-imgSign :: Sign -> Fix SymExpr
-imgSign s = Fix (Img s)
+pivot :: PivotNum -> Fix SymExpr
+pivot n = Fix (N n)
+
+pauli :: Pauli -> Fix SymExpr 
+pauli p = Fix (P p)
 
 -- (-1) * i * i
 e1 :: Fix SymExpr
-e1 = (oneSign Neg) .*. (imgSign Pos) .*. (imgSign Pos) .*. (Fix E)
+e1 = (pivot (Neg One)) .*. (pivot (Pos Img)) .*. (pivot (Pos Img)) .*. (((pauli X) .&. (pauli Y)) .&. (Fix E))
