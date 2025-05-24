@@ -61,6 +61,7 @@ executable clifford-sim
     other-modules:
         Ast
         , Parse
+        , PauliRules
         , Paths_clifford_sim
 
     -- LANGUAGE extensions used by modules in this package.
@@ -74,6 +75,8 @@ executable clifford-sim
         , megaparsec
         , parser-combinators
         , mtl
+        , hegg
+
     -- Directories containing source files.
     hs-source-dirs:   app
 

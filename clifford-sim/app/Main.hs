@@ -14,6 +14,7 @@ import System.Environment (getArgs)
 
 import Ast
 import Parse
+import PauliRules
 
 foreign import ccall "prog"
     prog :: CInt -> CInt           -- qubit_num -> gate_num 
@@ -148,3 +149,6 @@ main = do
   [file] <- getArgs
   putStrLn "welcome to HFClifford!"
   run file
+
+  let expr = rewrite e1 
+  print expr
