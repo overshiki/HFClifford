@@ -1,0 +1,27 @@
+this is an extended chp file, our extension is the defflow instruction, where, like in stim, we can use flow representation of a circuit in the simulator.
+for example, we can use:
+defflow h {
+  x -> z; 
+  z -> x;
+}
+to define a custom h gate 
+#
+defflow ch {
+  x -> z; 
+  z -> x;
+}
+ch 2
+c 2 3
+
+c 1 2
+h 2
+c 0 2
+h 2
+
+c 2 4
+c 4 2
+
+c 4 3
+h 4
+m 4
+m 3
