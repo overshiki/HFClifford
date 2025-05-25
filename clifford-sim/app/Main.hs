@@ -150,5 +150,10 @@ main = do
   putStrLn "welcome to HFClifford!"
   run file
 
-  let expr = rewrite e1 
-  print expr
+  -- let expr = rewrite e1 
+  -- print expr
+
+  -- let expr = rewrite y 
+  -- print expr
+  let exprs = map rewrite pauliRuleTests
+  mapM_ print exprs
