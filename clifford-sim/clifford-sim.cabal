@@ -76,6 +76,8 @@ executable clifford-sim
         , parser-combinators
         , mtl
         , hegg
+        , unordered-containers
+        , containers
 
     -- Directories containing source files.
     hs-source-dirs:   app

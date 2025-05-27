@@ -9,10 +9,16 @@ import qualified Text.Megaparsec.Char.Lexer as L
 -- import System.IO
 import Control.Applicative
 import GHC.Stack (HasCallStack)
+import Control.Monad.State.Lazy
 
+import qualified Data.HashMap.Strict as HS
+import qualified Data.Set as Set
 import Ast
 
-type Parser = Parsec Void String
+type Env = HS.HashMap String FlowGate
+
+-- type Parser = Parsec Void String
+type Parser = ParsecT Void String (State Env)
 
 sc :: Parser ()
 sc = L.space
@@ -36,15 +42,21 @@ safeManyTill p end = go
 manyBetween :: Parser a -> Parser a -> Parser String 
 manyBetween s e = s *> safeManyTill L.charLiteral e 
 
+-- runParser :: HasCallStack => Parser a -> String -> a 
+-- runParser p s = case parse p "" s of 
+--   Left bundle -> error (errorBundlePretty bundle)
+--   Right r -> r
+
 runParser :: HasCallStack => Parser a -> String -> a 
-runParser p s = case parse p "" s of 
+runParser p s = case v of 
   Left bundle -> error (errorBundlePretty bundle)
   Right r -> r
-
+  where 
+    m = runParserT p "" s
+    (v, _) = runState m HS.empty
 
 parseInt :: Parser Int 
 parseInt = lexeme $ L.signed sc L.decimal
-
 
 parseH :: Parser Gate 
 parseH = do 
@@ -70,6 +82,32 @@ parseM = do
   lstring "m"
   index <- parseInt
   return $ M (QIndex index)
+
+-- excludeChar :: [Char]
+-- excludeChar = ['(', ')', '{', '}', '[', ']']
+
+parseVar :: Parser String 
+parseVar = do 
+  -- let 
+  --   match = do 
+  --     s <- L.charLiteral 
+  --     if s `elem` excludeChar 
+  --       then return ()
+  --       else parseError $ FancyError 0 (Set.singleton (ErrorFail "fail"))
+  lexeme $ safeManyTill L.charLiteral (lookAhead (try space1 <|> eof))
+
+parsePauli :: Parser Pauli
+parsePauli =  
+  try (lstring "x" >> return X) <|>
+  try (lstring "y" >> return Y) <|> 
+  try (lstring "z" >> return Z) <|> 
+  (lstring "i" >> return I)
+
+-- parseFlow :: Parser ()
+-- parseFlow = do 
+--   lstring "defflow"
+--   n <- parseVar
+--   lstring "{"
 
 parseGate :: Parser Gate 
 parseGate = 

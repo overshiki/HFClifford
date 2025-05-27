@@ -13,15 +13,13 @@ import Data.Equality.Saturation
 import Data.Equality.Analysis
 import Data.Equality.Graph
 import Data.Equality.Graph.Lens
+import Ast (Pauli, Pauli (..))
 
 data IdNum = One | Img
   deriving (Eq, Ord, Show)
 
 data PivotNum = Pos IdNum 
   | Neg IdNum
-  deriving (Eq, Ord, Show)
-
-data Pauli = X | Z | Y | I
   deriving (Eq, Ord, Show)
 
 data SymExpr a = 

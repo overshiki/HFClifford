@@ -18,7 +18,14 @@ data Gate
   | CNOT QIndex QIndex
   | M QIndex
   | P QIndex
+  | Flow String [QIndex]
   deriving (Show)
+
+data Pauli = X | Z | Y | I
+  deriving (Eq, Ord, Show)
+
+data FlowGate = FlowGate [(Pauli, Pauli)]
+  deriving (Eq, Ord, Show)
 
 newtype Circuit = Circuit [Gate]
   deriving (Show)
