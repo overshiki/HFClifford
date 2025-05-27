@@ -11,6 +11,7 @@ import System.IO.Unsafe
 import Foreign.Marshal.Array
 import Data.List
 import System.Environment (getArgs)
+import qualified Data.HashMap.Strict as HS
 
 import Ast
 import Parse
@@ -61,11 +62,12 @@ buildProg :: String -> IO Prog
 buildProg file = do 
   s <- readFile file
   let 
-    c@(Circuit gs) = runParser parseFile s 
+    (env, c@(Circuit gs)) = runParser parseFile s 
     nq = collectNumQubits c 
     ng = length gs
     nm = collectMeasureNum c
     pauliL = (2 * nq + 1) * nq
+  print (HS.keys env)
   return $ Prog
     { nQubit = int2cint nq
     , nGate = int2cint ng

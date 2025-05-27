@@ -18,13 +18,14 @@ data Gate
   | CNOT QIndex QIndex
   | M QIndex
   | P QIndex
-  | Flow String [QIndex]
+  -- just single qubit flow, support multi-qubits flow in the future
+  | Flow String QIndex
   deriving (Show)
 
 data Pauli = X | Z | Y | I
   deriving (Eq, Ord, Show)
 
-data FlowGate = FlowGate [(Pauli, Pauli)]
+data FlowDef = FlowDef [(Pauli, Pauli)]
   deriving (Eq, Ord, Show)
 
 newtype Circuit = Circuit [Gate]
@@ -66,6 +67,7 @@ instance Encoding Gate where
   encoding (CNOT (QIndex i) (QIndex j)) = [3, i + 1, j + 1]
   -- 4 for measure 
   encoding (M (QIndex i)) = [4, i + 1, 0]
+  encoding c = error ("encoding fail for gate: " ++ show c)
 
 instance Encoding [Gate] where
   encoding gs = concatMap encoding gs
