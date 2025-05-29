@@ -16,6 +16,7 @@ import qualified Data.HashMap.Strict as HS
 import Ast
 import Parse
 import PauliRules
+import Infer
 
 foreign import ccall "prog"
     prog :: CInt -> CInt           -- qubit_num -> gate_num 
@@ -67,9 +68,11 @@ buildProg file = do
     ng = length gs
     nm = collectMeasureNum c
     pauliL = (2 * nq + 1) * nq
+    flows = map flowDef2lookup (HS.elems env)
   print (HS.keys env)
+  print (flows !! 0 )
   return $ Prog
-    { nQubit = int2cint nq
+    { nQubit = flows `seq` int2cint nq
     , nGate = int2cint ng
     , circEncode = fromVec $ map int2cint (encoding c)
     , measureRes = fromVec $ take nm (repeat (CBool 0))

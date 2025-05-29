@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Ast where
 import Data.Hashable
 import GHC.Generics
@@ -23,7 +24,7 @@ data Gate
   deriving (Show)
 
 data Pauli = X | Z | Y | I
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, Hashable)
 
 data FlowDef = FlowDef [(Pauli, Pauli)]
   deriving (Eq, Ord, Show)
@@ -85,6 +86,7 @@ xor False True = True
 xor False False = False
 
 newtype SingleGLookUp = SingleGLookUp [(Bool, Bool, Bool)]
+  deriving (Eq, Show)
 
 instance BEncoding SingleGLookUp where
   bencoding (SingleGLookUp bs) = bpack bs
@@ -92,6 +94,12 @@ instance BEncoding SingleGLookUp where
       bpack :: [(Bool, Bool, Bool)] -> [Bool]
       bpack ((b1, b2, b3):rbs) = b1:b2:b3:(bpack rbs)
       bpack [] = []
+
+pauli2rep :: Pauli -> (Bool, Bool, Bool)
+pauli2rep X = (True, False, False)
+pauli2rep Z = (False, True, False)
+pauli2rep Y = (True, True, False)
+pauli2rep I = (False, False, False)
 
 newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> Bool -> (Bool, Bool, Bool))
 

@@ -25,7 +25,7 @@ data PivotNum = Pos IdNum
 data SymExpr a = 
   a :*: a
   | a :&: a
-  | P Pauli
+  | PL Pauli
   | N PivotNum
   | E
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
@@ -37,7 +37,7 @@ cost :: CostFunction SymExpr Int
 cost = \case
   (a :*: b) -> a + b + 1
   (a :&: b) -> a + b + 2
-  (P _) -> 1
+  (PL _) -> 1
   (N _) -> 1
   E -> 0
 
@@ -91,7 +91,7 @@ rewrites =
     pivotFunc n1 n2 n3 = pat ((pat (N n1)) :*: (pat (N n2))) := pat (N n3)
 
     pauliFunc :: Pauli -> Pauli -> PivotNum -> Pauli -> Rewrite () SymExpr
-    pauliFunc p1 p2 piv p3 = pat ((pat (P p1)) :&: (pat (P p2))) := pat (pat (N piv) :*: (pat (P p3)))
+    pauliFunc p1 p2 piv p3 = pat ((pat (PL p1)) :&: (pat (PL p2))) := pat (pat (N piv) :*: (pat (PL p3)))
 
 
 rewrite :: Fix SymExpr -> Fix SymExpr
@@ -107,13 +107,13 @@ pivot :: PivotNum -> Fix SymExpr
 pivot n = Fix (N n)
 
 pauli :: Pauli -> Fix SymExpr 
-pauli p = Fix (P p)
+pauli p = Fix (PL p)
 
 pauliMapFunc :: (Pauli -> Pauli) -> Fix SymExpr -> Fix SymExpr
 pauliMapFunc pauliFunc = \case 
   Fix (a :*: b) -> Fix ((func a) :*: (func b))
   Fix (a :&: b) -> Fix ((func a) :&: (func b))
-  Fix (P p) -> Fix (P (pauliFunc p))
+  Fix (PL p) -> Fix (PL (pauliFunc p))
   Fix (N n) -> Fix (N n) 
   Fix E -> Fix E
   where 
@@ -126,9 +126,11 @@ e1 = (pivot (Neg One)) .*. (pivot (Pos Img)) .*. (pivot (Pos Img)) .*. (((pauli 
 -- H : X -> Z, Z -> X
 -- how about H : Y -> ?
 -- we know Y = iXZ
-y :: Fix SymExpr 
+y :: Fix SymExpr
 y = (pivot (Pos Img)) .*. ((pauli X) .&. (pauli Z))
 
+
+-- just some test
 hFunc :: Pauli -> Pauli 
 hFunc X = Z 
 hFunc Z = X 
