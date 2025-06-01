@@ -63,6 +63,7 @@ executable clifford-sim
         , Parse
         , PauliRules
         , Infer
+        , Encoding
         , Paths_clifford_sim
 
     -- LANGUAGE extensions used by modules in this package.

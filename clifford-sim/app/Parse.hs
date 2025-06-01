@@ -17,8 +17,6 @@ import qualified Data.Set as Set
 import Ast
 import Data.Maybe
 
-type Env = HS.HashMap String FlowDef
-
 -- type Parser = Parsec Void String
 type Parser = ParsecT Void String (State Env)
 
@@ -123,8 +121,6 @@ parsePauliArrow = do
   lstring ";"
   return (p1, p2)
 
-
-
 parseFlowDef :: Parser ()
 parseFlowDef = do
   lstring "defflow"
@@ -133,7 +129,6 @@ parseFlowDef = do
   cs <- safeManyTill (lexeme parsePauliArrow) (lstring "}")
   let flow = FlowDef cs
   updateFlowDef n flow
-
 
 parseGate :: Parser Gate
 parseGate =

@@ -5,6 +5,7 @@
 module Ast where
 import Data.Hashable
 import GHC.Generics
+import qualified Data.HashMap.Strict as HS
 
 -- Qubit index, as column in CHP paper 
 newtype QIndex = QIndex Int
@@ -29,6 +30,8 @@ data Pauli = X | Z | Y | I
 data FlowDef = FlowDef [(Pauli, Pauli)]
   deriving (Eq, Ord, Show)
 
+type Env = HS.HashMap String FlowDef
+
 newtype Circuit = Circuit [Gate]
   deriving (Show)
 
@@ -40,6 +43,7 @@ collectNumQubits_ n (Circuit (g:gs)) = collectNumQubits_ (max mindex n) (Circuit
       (CNOT (QIndex i) (QIndex j)) -> max i j
       (M (QIndex i)) -> i
       (P (QIndex i)) -> i
+      (Flow _ (QIndex i)) -> i
 collectNumQubits_ n (Circuit []) = n
 
 collectNumQubits :: Circuit -> Int
@@ -56,25 +60,27 @@ collectMeasureNum_ n (Circuit []) = n
 collectMeasureNum :: Circuit -> Int
 collectMeasureNum c = collectMeasureNum_ 0 c
 
-class Encoding a where
-  encoding :: a -> [Int]
+-- class Encoding a where
+--   encoding :: a -> [Int]
 
-instance Encoding Gate where
-  -- 1 for hardmard
-  encoding (H (QIndex i)) = [1, i + 1, 0]
-  -- 2 for phase
-  encoding (P (QIndex i)) = [2, i + 1, 0]
-  -- 3 for cnot 
-  encoding (CNOT (QIndex i) (QIndex j)) = [3, i + 1, j + 1]
-  -- 4 for measure 
-  encoding (M (QIndex i)) = [4, i + 1, 0]
-  encoding c = error ("encoding fail for gate: " ++ show c)
+-- instance Encoding Gate where
+--   -- 1 for hardmard
+--   encoding (H (QIndex i)) = [1, i + 1, 0]
+--   -- 2 for phase
+--   encoding (P (QIndex i)) = [2, i + 1, 0]
+--   -- 3 for cnot 
+--   encoding (CNOT (QIndex i) (QIndex j)) = [3, i + 1, j + 1]
+--   -- 4 for measure 
+--   encoding (M (QIndex i)) = [4, i + 1, 0]
+--   -- 5 for flow 
+--   encoding (Flow name (QIndex i)) = error "error in encoding flow"
+--   encoding c = error ("encoding fail for gate: " ++ show c)
 
-instance Encoding [Gate] where
-  encoding gs = concatMap encoding gs
+-- instance Encoding [Gate] where
+--   encoding gs = concatMap encoding gs
 
-instance Encoding Circuit where
-  encoding (Circuit gs) = encoding gs
+-- instance Encoding Circuit where
+--   encoding (Circuit gs) = encoding gs
 
 class BEncoding a where
   bencoding :: a -> [Bool]
@@ -103,11 +109,6 @@ pauli2rep I = (False, False, False)
 
 newtype SingleStabFlow = SingleStabFlow (Bool -> Bool -> Bool -> (Bool, Bool, Bool))
 
-hFlow :: SingleStabFlow
-hFlow = SingleStabFlow func
-  where
-    func xia zia ri = (zia, xia, ri `xor` (xia && zia))
-
 type BitWidth = Int
 int2boolL_ :: [Bool] -> BitWidth -> Int -> [Bool]
 int2boolL_ blist 0 0 = blist
@@ -128,19 +129,23 @@ singleFlow2lookup (SingleStabFlow func) = SingleGLookUp
     nfunc [x, y, z] = func x y z
     nfunc _ = error "value error"
 
+-- hFlow :: SingleStabFlow
+-- hFlow = SingleStabFlow func
+--   where
+--     func xia zia ri = (zia, xia, ri `xor` (xia && zia))
 
-hLookUp :: SingleGLookUp
-hLookUp = singleFlow2lookup hFlow
+-- hLookUp :: SingleGLookUp
+-- hLookUp = singleFlow2lookup hFlow
 
-pFlow :: SingleStabFlow
-pFlow = SingleStabFlow func
-  where
-    func xia zia ri = (xia, xia `xor` zia, ri `xor` (xia && zia))
+-- pFlow :: SingleStabFlow
+-- pFlow = SingleStabFlow func
+--   where
+--     func xia zia ri = (xia, xia `xor` zia, ri `xor` (xia && zia))
 
-pLookUp :: SingleGLookUp
-pLookUp = singleFlow2lookup pFlow
+-- pLookUp :: SingleGLookUp
+-- pLookUp = singleFlow2lookup pFlow
 
--- 1 for hardmard 
--- 2 for phase
-gateRepresentation :: [Bool]
-gateRepresentation = (bencoding hLookUp) ++ (bencoding pLookUp)
+-- -- 1 for hardmard 
+-- -- 2 for phase
+-- gateRepresentation :: [Bool]
+-- gateRepresentation = (bencoding hLookUp) ++ (bencoding pLookUp)

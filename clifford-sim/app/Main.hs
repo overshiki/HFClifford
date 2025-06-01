@@ -17,6 +17,7 @@ import Ast
 import Parse
 import PauliRules
 import Infer
+import Encoding
 
 foreign import ccall "prog"
     prog :: CInt -> CInt           -- qubit_num -> gate_num 
@@ -68,16 +69,16 @@ buildProg file = do
     ng = length gs
     nm = collectMeasureNum c
     pauliL = (2 * nq + 1) * nq
-    flows = map flowDef2lookup (HS.elems env)
-  print (HS.keys env)
-  print (flows !! 0 )
+    -- flows = map flowDef2lookup (HS.elems env)
+  -- print (HS.keys env)
+  -- print (flows !! 0 )
   return $ Prog
-    { nQubit = flows `seq` int2cint nq
+    { nQubit = int2cint nq
     , nGate = int2cint ng
-    , circEncode = fromVec $ map int2cint (encoding c)
+    , circEncode = fromVec $ map int2cint (encoding (env, c))
     , measureRes = fromVec $ take nm (repeat (CBool 0))
     , pauli = fromVec $ take pauliL (repeat (CBool 0))
-    , gateRep = fromVec (map bool2cbool gateRepresentation)
+    , gateRep = fromVec (map bool2cbool (gateRepresentation env))
     }
 
 cbool2bool :: CBool -> Bool

@@ -1,3 +1,4 @@
 build
 dist-newstyle
 clifford-sim/lib/libchp.so
+*.mod

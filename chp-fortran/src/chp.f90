@@ -50,19 +50,35 @@ contains
     res = res + 1
   end function 
 
-  pure function get_hardmard_rep(gate_rep_pack) result(res)
-    ! 1 for hardmard
+  pure function get_gate_rep(gate_rep_pack, i) result(res)
+    ! i for gate id 
+    ! for example:
+    ! 1 for hardmard 
+    ! 2 for phase
     logical, intent(in) :: gate_rep_pack(:)
+    integer, intent(in) :: i
     logical :: res(8, 3)
-    res = unpack_gate_rep(gate_rep_pack(1:24))
+    integer :: i_start, i_end 
+    i_start = (i - 1) * 24 + 1 
+    i_end = i * 24
+    res = unpack_gate_rep(gate_rep_pack(i_start:i_end))
   end function
 
-  pure function get_phase_rep(gate_rep_pack) result(res)
-    ! 2 for hardmard
-    logical, intent(in) :: gate_rep_pack(:)
-    logical :: res(8, 3)
-    res = unpack_gate_rep(gate_rep_pack(25:48))
-  end function
+  ! pure function get_hardmard_rep(gate_rep_pack) result(res)
+  !   ! 1 for hardmard
+  !   logical, intent(in) :: gate_rep_pack(:)
+  !   logical :: res(8, 3)
+  !   ! res = unpack_gate_rep(gate_rep_pack(1:24))
+  !   res = get_gate_rep(gate_rep_pack, 1)
+  ! end function
+
+  ! pure function get_phase_rep(gate_rep_pack) result(res)
+  !   ! 2 for hardmard
+  !   logical, intent(in) :: gate_rep_pack(:)
+  !   logical :: res(8, 3)
+  !   ! res = unpack_gate_rep(gate_rep_pack(25:48))
+  !   res = get_gate_rep(gate_rep_pack, 2)
+  ! end function
 
   pure function single_lookup_x(xia, zia, ri, gate_rep) result(res)
     ! single qubit gate lookup
@@ -88,31 +104,31 @@ contains
     res = gate_rep(logical2number([xia, zia, ri], 3), 3)
   end function
 
-  subroutine hardmard(g, a, gate_rep)
-    type(generators), intent(inout) :: g
-    integer, intent(in) :: a
-    logical, intent(in) :: gate_rep(8, 3)
-    integer :: i
-    logical :: xia, zia, ri, res
+  ! subroutine hardmard(g, a, gate_rep)
+  !   type(generators), intent(inout) :: g
+  !   integer, intent(in) :: a
+  !   logical, intent(in) :: gate_rep(8, 3)
+  !   integer :: i
+  !   logical :: xia, zia, ri, res
 
-    do i=1, (2 * g%n) 
-      xia = g%x_table(i, a)
-      zia = g%z_table(i, a)
-      ri = g%r_table(i)
+  !   do i=1, (2 * g%n) 
+  !     xia = g%x_table(i, a)
+  !     zia = g%z_table(i, a)
+  !     ri = g%r_table(i)
 
-      res = ri .xor. (xia .and. zia)
-      g%r_table(i) = single_lookup_r(xia, zia, ri, gate_rep)
-      ! res
-      ! swap xia with zia
-      g%x_table(i, a) = single_lookup_x(xia, zia, ri, gate_rep)
-        ! zia 
-      g%z_table(i, a) = single_lookup_z(xia, zia, ri, gate_rep)
-        ! xia
-    end do
+  !     res = ri .xor. (xia .and. zia)
+  !     g%r_table(i) = single_lookup_r(xia, zia, ri, gate_rep)
+  !     ! res
+  !     ! swap xia with zia
+  !     g%x_table(i, a) = single_lookup_x(xia, zia, ri, gate_rep)
+  !       ! zia 
+  !     g%z_table(i, a) = single_lookup_z(xia, zia, ri, gate_rep)
+  !       ! xia
+  !   end do
 
-  end subroutine
+  ! end subroutine
 
-  subroutine phase(g, a, gate_rep)
+  subroutine encoded_single_gate(g, a, gate_rep)
     type(generators), intent(inout) :: g
     integer, intent(in) :: a
     logical, intent(in) :: gate_rep(8, 3)
@@ -391,14 +407,15 @@ contains
     type(measure_result) :: mr
     logical(c_bool), dimension(:,:), allocatable :: pbs
     integer :: start_slice, end_slice
-    logical :: hardmard_rep(8, 3), phase_rep(8, 3)
+    logical :: single_gate_rep(8, 3)
+    ! logical :: hardmard_rep(8, 3), phase_rep(8, 3), single_gate_rep(8, 3)
 
     do i=1, repln
       grep(i) = logical(gate_rep(i))
     end do 
 
-    hardmard_rep = get_hardmard_rep(grep)
-    phase_rep = get_phase_rep(grep)
+    ! hardmard_rep = get_hardmard_rep(grep)
+    ! phase_rep = get_phase_rep(grep)
 
     g%n = qubit_n
     allocate(g%x_table(2*qubit_n + 1, qubit_n))
@@ -409,25 +426,31 @@ contains
     measure_count = 1
     do i=1, gate_n
       gate = prog_encoding(3 * (i - 1) + 1)
-      ! 1 for hardmard
-      if (gate .eq. 1) then 
-        a = prog_encoding(3 * (i - 1) + 2)
-        call hardmard(g, a, hardmard_rep)
+      ! ! 1 for hardmard
+      ! if (gate .eq. 1) then 
+      !   a = prog_encoding(3 * (i - 1) + 2)
+      !   call encoded_single_gate(g, a, hardmard_rep)
       ! 2 for phase
-      else if (gate .eq. 2) then 
-        a = prog_encoding(3 * (i - 1) + 2)
-        call phase(g, a, phase_rep)
-      ! 3 for cnot 
-      else if (gate .eq. 3) then 
+      ! else if (gate .eq. 2) then 
+      !   a = prog_encoding(3 * (i - 1) + 2)
+      !   call encoded_single_gate(g, a, phase_rep)
+      ! -1 for cnot 
+      if (gate .eq. -1) then 
         a = prog_encoding(3 * (i - 1) + 2)
         b = prog_encoding(3 * (i - 1) + 3)
         call cnot(g, a, b)
-      ! 4 for measure 
-      else if (gate .eq. 4) then 
+      ! 0 for measure 
+      else if (gate .eq. 0) then 
         a = prog_encoding(3 * (i - 1) + 2)
         call measure(g, a, mr)
         measure_array(measure_count) = mr%m
         measure_count = measure_count + 1
+      else if (gate >= 1) then 
+        single_gate_rep = get_gate_rep(grep, gate)
+        a = prog_encoding(3 * (i - 1) + 2)
+        call encoded_single_gate(g, a, single_gate_rep)
+      else 
+        stop "error"
       end if 
     end do 
 
