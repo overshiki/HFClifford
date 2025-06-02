@@ -1,0 +1,35 @@
+
+CHP: Efficient Simulator for Stabilizer Quantum Circuits
+by Scott Aaronson
+
+Outcome of measuring qubit 0: 0 (random)
+Outcome of measuring qubit 1: 0 (random)
+Outcome of measuring qubit 2: 0
+
+Final state:
++XIZXI
++IXIIX
++IIXZI
++IIZXI
++IIXZX
+------
++ZIIII
++IZIII
++IZZIZ
++ZIIZI
++IZIIZ
+
++XIIII
++IXIII
++IIXZI
++IIZXI
++IIXZX
+------
++ZIIII
++IZIII
++IIZIZ
++IIIZI
++IIIIZ
+
+2^0 nonzero basis states
+ +|00000>
