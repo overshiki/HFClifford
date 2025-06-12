@@ -390,7 +390,10 @@ contains
     end do 
   end subroutine 
 
-  subroutine prog(qubit_n, gate_n, prog_encoding, prn, measure_array, mn, pauli_res, pln, gate_rep, repln) bind(c, name="prog")
+  subroutine prog(qubit_n, gate_n, &
+    prog_encoding, prn, measure_array, &
+    mn, pauli_res, pln, gate_rep, repln, &
+    measure_rand) bind(c, name="prog")
     use iso_c_binding
     implicit none 
     integer(c_int), value, intent(in) :: qubit_n, gate_n
@@ -398,6 +401,7 @@ contains
     integer(c_int), value, intent(in) :: prn, mn, pln, repln
     integer(c_int), intent(in) :: prog_encoding(prn)
     logical(c_bool), intent(inout) :: measure_array(mn)
+    logical(c_bool), intent(inout) :: measure_rand(mn)
     logical(c_bool), intent(inout) :: pauli_res(pln)
     logical(c_bool), intent(in) :: gate_rep(repln)
     logical :: grep(repln)
@@ -407,7 +411,7 @@ contains
     type(measure_result) :: mr
     logical(c_bool), dimension(:,:), allocatable :: pbs
     integer :: start_slice, end_slice
-    logical :: single_gate_rep(8, 3)
+    logical :: single_gate_rep(8, 3), is_random
     ! logical :: hardmard_rep(8, 3), phase_rep(8, 3), single_gate_rep(8, 3)
 
     do i=1, repln
@@ -442,6 +446,9 @@ contains
       ! 0 for measure 
       else if (gate .eq. 0) then 
         a = prog_encoding(3 * (i - 1) + 2)
+        measure_rand(measure_count) = is_random_measure(g, a)
+        write (*, *) "qubit: ", a
+        write (*, *) "measure_rand(measure_count): ", measure_rand(measure_count) 
         call measure(g, a, mr)
         measure_array(measure_count) = mr%m
         measure_count = measure_count + 1

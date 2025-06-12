@@ -1,0 +1,15 @@
+program to run: data/teleport.chp
+nQubit: 5
+pauliRep:
++XIZXI
++IXIIX
++XZIXZ
++ZIIZI
++IZIIZ
+
+measureRes:
+[True,True,True]
+measure is random:
+[True,True,True]
+
+

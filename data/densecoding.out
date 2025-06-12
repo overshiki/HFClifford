@@ -1,0 +1,15 @@
+program to run: data/densecoding.chp
+nQubit: 5
+pauliRep:
++ZIIII
++IZIII
++ZIIIZ
++IZZZI
++IIZII
+
+measureRes:
+[False,True]
+measure is random:
+[True,True]
+
+

@@ -1,0 +1,19 @@
+program to run: data/simon.chp
+nQubit: 9
+pauliRep:
++ZIIIIXIII
++IZIIIXXII
++IIZIIIXXI
++IIIZIIIXX
++IIIIZIIIX
++XXIIIZIII
++IXXIIIZII
++IIXXIIIZI
++IIIXXIIIZ
+
+measureRes:
+[True,True,False,True,False,False,False,False,True]
+measure is random:
+[True,True,True,True,True,True,True,True,True]
+
+

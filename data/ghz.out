@@ -1,0 +1,13 @@
+program to run: data/ghz.chp
+nQubit: 3
+pauliRep:
+-YIY
+-IYY
++XXZ
+
+measureRes:
+[True,True,False]
+measure is random:
+[True,True,True]
+
+

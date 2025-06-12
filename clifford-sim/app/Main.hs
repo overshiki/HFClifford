@@ -12,6 +12,7 @@ import Foreign.Marshal.Array
 import Data.List
 import System.Environment (getArgs)
 import qualified Data.HashMap.Strict as HS
+import System.IO
 
 import Ast
 import Parse
@@ -25,6 +26,7 @@ foreign import ccall "prog"
             -> Ptr CBool -> CInt   -- measure_array -> length
             -> Ptr CBool -> CInt   -- pauli_res -> length 
             -> Ptr CBool -> CInt   -- gate_rep
+            -> Ptr CBool           -- measure_rand
             -> IO ()
 
 int2cint :: Int -> CInt
@@ -45,12 +47,14 @@ data Prog = Prog
   , measureRes :: VecPac CBool
   , pauli :: VecPac CBool
   , gateRep :: VecPac CBool
+  , measureRand :: VecPac CBool
   }
 
-runProg :: Prog -> IO (Ptr CBool, Ptr CBool)
+runProg :: Prog -> IO (Ptr CBool, Ptr CBool, Ptr CBool)
 runProg (Prog { .. }) = do 
   cePtr <- newArray (d circEncode)
   mrPtr <- newArray (d measureRes)
+  mrandPtr <- newArray (d measureRand)
   pauliPtr <- newArray (d pauli)
   gateRepPtr <- newArray (d gateRep)
   prog nQubit nGate 
@@ -58,7 +62,8 @@ runProg (Prog { .. }) = do
     mrPtr (dl measureRes) 
     pauliPtr (dl pauli)
     gateRepPtr (dl gateRep)
-  return (pauliPtr, mrPtr)
+    mrandPtr
+  return (pauliPtr, mrPtr, mrandPtr)
 
 buildProg :: String -> IO Prog
 buildProg file = do 
@@ -79,6 +84,7 @@ buildProg file = do
     , measureRes = fromVec $ take nm (repeat (CBool 0))
     , pauli = fromVec $ take pauliL (repeat (CBool 0))
     , gateRep = fromVec (map bool2cbool (gateRepresentation env))
+    , measureRand = fromVec $ take nm (repeat (CBool 0))
     }
 
 cbool2bool :: CBool -> Bool
@@ -123,43 +129,54 @@ getPauliRep n bs@(b:_) = (getPauliRepEach n cs) ++ "\n" ++ (getPauliRep n remain
       else error "value error"
 getPauliRep n [] = ""
 
-run :: String -> IO ()
-run file = do 
+
+logFresh :: Maybe String -> IO ()
+logFresh Nothing = return ()
+logFresh (Just file) = writeFile file ""
+
+logAppend :: Maybe String -> String -> IO ()
+logAppend Nothing s = putStrLn s 
+logAppend (Just file) s = appendFile file (s ++ "\n")
+
+run :: Maybe String -> String -> IO ()
+run mlog file = do 
   prog@(Prog {..}) <- buildProg file
-  (pauliPtr, mrPtr) <- runProg prog
+  (pauliPtr, mrPtr, mrandPtr) <- runProg prog
   pauliRep <- readout (dl pauli) pauliPtr
   measures <- readout (dl measureRes) mrPtr
-  putStrLn $ "program to run: " ++ file
-  putStrLn $ "nQubit: " ++ show nQubit
-  -- putStrLn $ "pauli Length: " ++ show (dl pauli)
-  putStrLn $ "pauliRep:"
-  putStr $ getPauliRep (fromIntegral nQubit) pauliRep
+  measureIsRandom <- readout (dl measureRand) mrandPtr
+  logFresh mlog 
+  let logout = logAppend mlog
+  logout $ "program to run: " ++ file
+  logout $ "nQubit: " ++ show nQubit
+  -- logout $ "pauli Length: " ++ show (dl pauli)
+  logout $ "pauliRep:"
+  logout $ getPauliRep (fromIntegral nQubit) pauliRep
   -- print pauliRep
-  putStrLn $ "measureRes:"
-  print measures
-  putStrLn ""
+  logout $ "measureRes:"
+  logout $ show measures
+  logout $ "measure is random:"
+  logout $ show measureIsRandom
+  logout "\n"
   return ()
 
 test :: IO ()
 test = do
-  putStrLn "welcome to HFClifford!"
-  run "data/epr.chp"
-  run "data/ghz.chp"
-  run "data/teleport.chp"
-  run "data/simon.chp"
-  run "data/densecoding.chp"
-  run "data/qecc9.chp"
+  -- putStrLn "welcome to HFClifford!"
+  -- let runlog = run Nothing
+  -- run (Just "data/epr.out") "data/epr.chp"
+  -- run (Just "data/ghz.out") "data/ghz.chp"
+  -- run (Just "data/teleport.out") "data/teleport.chp"
+  -- run (Just "data/simon.out") "data/simon.chp"
+  run (Just "data/densecoding.out") "data/densecoding.chp"
+  -- run (Just "data/qecc9.out") "data/qecc9.chp"
 
 main :: IO ()
 main = do
+  test
   [file] <- getArgs
   putStrLn "welcome to HFClifford!"
-  run file
+  run Nothing file
 
-  -- let expr = rewrite e1 
-  -- print expr
-
-  -- let expr = rewrite y 
-  -- print expr
-  let exprs = map rewrite pauliRuleTests
-  mapM_ print exprs
+  -- let exprs = map rewrite pauliRuleTests
+  -- mapM_ print exprs

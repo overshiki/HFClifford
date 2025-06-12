@@ -1,0 +1,12 @@
+program to run: data/epr.chp
+nQubit: 2
+pauliRep:
++XX
++ZZ
+
+measureRes:
+[False]
+measure is random:
+[True]
+
+
