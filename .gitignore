@@ -5,3 +5,4 @@ clifford-sim/lib/libchp.so
 data/chp.c
 data/Makefile
 data/chp
+chp-fortran/src/chp.mod
