@@ -64,22 +64,6 @@ contains
     res = unpack_gate_rep(gate_rep_pack(i_start:i_end))
   end function
 
-  ! pure function get_hardmard_rep(gate_rep_pack) result(res)
-  !   ! 1 for hardmard
-  !   logical, intent(in) :: gate_rep_pack(:)
-  !   logical :: res(8, 3)
-  !   ! res = unpack_gate_rep(gate_rep_pack(1:24))
-  !   res = get_gate_rep(gate_rep_pack, 1)
-  ! end function
-
-  ! pure function get_phase_rep(gate_rep_pack) result(res)
-  !   ! 2 for hardmard
-  !   logical, intent(in) :: gate_rep_pack(:)
-  !   logical :: res(8, 3)
-  !   ! res = unpack_gate_rep(gate_rep_pack(25:48))
-  !   res = get_gate_rep(gate_rep_pack, 2)
-  ! end function
-
   pure function single_lookup_x(xia, zia, ri, gate_rep) result(res)
     ! single qubit gate lookup
     logical, intent(in) :: xia, zia, ri
@@ -103,30 +87,6 @@ contains
     logical :: res
     res = gate_rep(logical2number([xia, zia, ri], 3), 3)
   end function
-
-  ! subroutine hardmard(g, a, gate_rep)
-  !   type(generators), intent(inout) :: g
-  !   integer, intent(in) :: a
-  !   logical, intent(in) :: gate_rep(8, 3)
-  !   integer :: i
-  !   logical :: xia, zia, ri, res
-
-  !   do i=1, (2 * g%n) 
-  !     xia = g%x_table(i, a)
-  !     zia = g%z_table(i, a)
-  !     ri = g%r_table(i)
-
-  !     res = ri .xor. (xia .and. zia)
-  !     g%r_table(i) = single_lookup_r(xia, zia, ri, gate_rep)
-  !     ! res
-  !     ! swap xia with zia
-  !     g%x_table(i, a) = single_lookup_x(xia, zia, ri, gate_rep)
-  !       ! zia 
-  !     g%z_table(i, a) = single_lookup_z(xia, zia, ri, gate_rep)
-  !       ! xia
-  !   end do
-
-  ! end subroutine
 
   subroutine encoded_single_gate(g, a, gate_rep)
     type(generators), intent(inout) :: g
