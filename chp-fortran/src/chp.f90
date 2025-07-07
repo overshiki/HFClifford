@@ -16,15 +16,6 @@ module chp
 
 contains
 
-  pure function unpack_gate_rep(gate_rep) result(res)
-    logical, intent(in) :: gate_rep(24)
-    logical :: res(8, 3)
-    integer :: i 
-    do i=1, 8 
-      res(i, :) = gate_rep(((i-1)*3 + 1):i*3)
-    end do 
-  end function
-
   pure function logical2int(l) result(res)
     logical, intent(in) :: l 
     integer :: res 
@@ -50,6 +41,17 @@ contains
     res = res + 1
   end function 
 
+  ! fetch the gate representations
+  pure function unpack_gate_rep(gate_rep) result(res)
+    logical, intent(in) :: gate_rep(24)
+    logical :: res(8, 3)
+    integer :: i 
+    do i=1, 8 
+      res(i, :) = gate_rep(((i-1)*3 + 1):i*3)
+    end do 
+  end function
+
+  ! fetch the gate representations
   pure function get_gate_rep(gate_rep_pack, i) result(res)
     ! i for gate id 
     ! for example:
